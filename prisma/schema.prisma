@@ -1,0 +1,192 @@
+// prisma/schema.prisma (versão atualizada)
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Profile {
+  id                   String   @id @default(uuid())
+  userId               String   @unique
+  email                String
+  subscriptionTier     String?
+  subscriptionActive   Boolean  @default(false)
+  stripeSubscriptionId String?  @unique
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  // Dados físicos
+  height               Float?   // altura em metros
+  startWeight          Float?   // peso inicial
+  targetWeight         Float?   // peso meta
+  currentWeight        Float?   // peso atual
+  dietType             String?  // tipo de dieta atual
+  cookingLevel         String?  // nível na cozinha
+  
+  // Relações
+  mealPlans     MealPlan[]
+  shoppingLists ShoppingList[]
+  weightLogs    WeightLog[]
+  preferences   UserPreferences?
+}
+
+// 🔥 NOVO MODELO PARA DETALHES NUTRICIONAIS
+model NutritionalInfo {
+  id          String   @id @default(uuid())
+  mealId      String   @unique
+  meal        Meal     @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  calories    Int
+  protein     Float    // em gramas
+  carbs       Float    // em gramas
+  fat         Float    // em gramas
+  fiber       Float?   // em gramas
+  sugar       Float?   // em gramas
+  sodium      Float?   // em mg
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// 🔥 NOVO MODELO PARA REFEIÇÕES DETALHADAS
+model Meal {
+  id          String   @id @default(uuid())
+  dayPlanId   String
+  dayPlan     DayPlan  @relation(fields: [dayPlanId], references: [id], onDelete: Cascade)
+  type        String   // "breakfast", "lunch", "dinner", "snack"
+  name        String
+  description String?
+  prepTime    Int?     // minutos
+  difficulty  String?  // "Fácil", "Médio", "Difícil"
+  servings    Int?     @default(1)
+  
+  // Feedback
+  rating      Int?     // 1-5
+  completed   Boolean  @default(false)
+  isFavorite  Boolean  @default(false)
+  userNotes   String?
+  
+  // Relações
+  nutritionalInfo NutritionalInfo?
+  ingredients     Ingredient[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// 🔥 NOVO MODELO PARA INGREDIENTES
+model Ingredient {
+  id          String   @id @default(uuid())
+  mealId      String
+  meal        Meal     @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  name        String
+  amount      Float
+  unit        String   // "g", "kg", "ml", "xícara", "colher"
+  notes       String?  // "picado", "cozido", etc
+  
+  createdAt   DateTime @default(now())
+}
+
+model MealPlan {
+  id          String    @id @default(uuid())
+  userId      String
+  user        Profile   @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  name        String?   // "Meu plano de verão"
+  dietType    String
+  calories    Int
+  allergies   String?
+  cuisine     String?
+  snacks      Boolean
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  isTemplate  Boolean   @default(false)
+  favorite    Boolean   @default(false)  // Para marcar como favorito
+  
+  // 🔥 ADICIONAR CAMPO PARA SALVAR CONTEXTO DO USUÁRIO
+  userContext Json?     // Salva os dados do usuário no momento da criação
+  
+  // Relações
+  days        DayPlan[]
+  shoppingLists ShoppingList[]
+  sharedPlans   SharedPlan[]
+  
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model DayPlan {
+  id          String    @id @default(uuid())
+  mealPlanId  String
+  mealPlan    MealPlan  @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  day         String    // Monday, Tuesday, etc (armazenar em inglês)
+  
+  // 🔥 SUBSTITUIR STRINGS POR RELAÇÕES
+  breakfast   String?   // REMOVER - vamos usar o modelo Meal
+  lunch       String?   // REMOVER
+  dinner      String?   // REMOVER
+  snacks      String?   // REMOVER
+  
+  // 🔥 ADICIONAR RELAÇÕES
+  meals       Meal[]    // Todas as refeições do dia
+  
+  // Feedback do dia
+  dayRating   Int?      // 1-5
+  dayFeedback String?   // Comentário sobre o dia
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@unique([mealPlanId, day])
+  @@index([mealPlanId])
+}
+
+model ShoppingList {
+  id          String    @id @default(uuid())
+  userId      String
+  user        Profile   @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  mealPlanId  String
+  mealPlan    MealPlan  @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  items       Json      // Lista de itens agrupados por categoria
+  createdAt   DateTime  @default(now())
+  
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model WeightLog {
+  id          String    @id @default(uuid())
+  userId      String
+  user        Profile   @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  weight      Float     // Peso em kg
+  date        DateTime  @default(now())
+  notes       String?
+  
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+}
+
+model UserPreferences {
+  id            String    @id @default(uuid())
+  userId        String    @unique
+  user          Profile   @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  dislikedFoods String[]  // Alimentos que não gosta (array)
+  preferredFoods String[] // Alimentos que prefere (array)
+  maxPrepTime   Int?      // Minutos máximos de preparo
+  budgetLevel   String?   // "low", "medium", "high"
+  dietGoal      String?   // "perder peso", "ganhar massa", "manter"
+  updatedAt     DateTime  @updatedAt
+}
+
+model SharedPlan {
+  id          String    @id @default(uuid())
+  mealPlanId  String
+  mealPlan    MealPlan  @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  shareToken  String    @unique @default(uuid())
+  expiresAt   DateTime? // Se null, não expira
+  createdAt   DateTime  @default(now())
+  views       Int       @default(0)
+  
+  @@index([shareToken])
+}
