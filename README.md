@@ -1,51 +1,146 @@
-# Full Stack AI SaaS Web App with Authentication 🤯
-## Overview
-This project is a full stack AI SaaS web application built with NextJS 15, TailwindCSS, Stripe, TypeScript, and Clerk for user authentication, featuring robust user authentication, secure payment processing, and a modern responsive design.
+<div align="center">
 
-## Features
-- **User Authentication:** Secure sign-up, sign-in, and profile management using [Clerk](https://go.clerk.com/TFWZCy5).
-- **Responsive UI:** Sleek and modern interface built with TailwindCSS.
-- **Payment Processing:** Subscription management and secure payments via Stripe.
-- **Type Safety:** Fully typed with TypeScript for improved maintainability.
-- **Scalable Architecture:** Built on NextJS 15 with serverless functions and modern best practices.
+<img src="./public/logo.png" alt="SmartPlate AI" width="120" />
 
-## Technologies Used
-- NextJS 15
-- TailwindCSS
-- Stripe
-- TypeScript
-- Clerk
-- Prisma
-- PostgreSQL
+# SmartPlate AI
 
-## Tutorial Video
-Watch our detailed YouTube tutorial on how to build this project:  
-[Build A Full Stack AI SaaS Web App With Authentication In NextJS 15, TailwindCSS, Stripe, TypeScript](https://youtu.be/RUE3nYI75VE)
+**SaaS de planejamento alimentar que combina preferências do usuário, acompanhamento de peso e inteligência artificial para gerar planos semanais e listas de compras.**
 
-## Installation
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/yourusername/yourproject.git
-   ```
-2. **Navigate into the project directory:**
-   ```bash
-   cd yourproject
-   ```
-3. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-4. **Configure Environment Variables:**  
-   Create a `.env.local` file in the project root and add your required variables (e.g., `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_BASE_URL`, `OPEN_ROUTER_API_KEY`, `CLERK_SECRET_KEY`, `DATABASE`, etc.).
-5. **Run the Development Server:**
-   ```bash
-   npm run dev
-   ```
+<img src="https://skillicons.dev/icons?i=ts,nextjs,react,tailwind,postgres,prisma,vercel&theme=dark" alt="TypeScript, Next.js, React, Tailwind CSS, PostgreSQL, Prisma e Vercel" />
 
-## Usage
-- Visit `http://localhost:3000` to view the application.
-- Sign up or sign in using Clerk.
-- Manage your subscriptions and explore the AI-powered features.
+</div>
 
-## Contributing
-Contributions are welcome! Please fork the repository, create a feature branch, and submit a pull request. For major changes, please open an issue first to discuss what you would like to change.
+## Sobre o projeto
+
+O SmartPlate AI permite que o usuário registre seus dados físicos, objetivo, preferências alimentares e nível de experiência na cozinha. A aplicação utiliza essas informações para gerar um plano alimentar de sete dias com refeições, calorias, macronutrientes, tempo de preparo e dificuldade.
+
+Além da geração do plano, o sistema mantém histórico, cria listas de compras, acompanha a evolução de peso e controla assinaturas recorrentes.
+
+> Os conteúdos gerados são informativos e não substituem avaliação ou acompanhamento de nutricionista ou outro profissional de saúde.
+
+## Funcionalidades
+
+- Cadastro, login e gerenciamento de sessão com Clerk
+- Perfil com altura, peso inicial, peso atual, meta e tipo de dieta
+- Preferências de alimentos, restrições, objetivo, orçamento e tempo de preparo
+- Geração de plano alimentar completo para sete dias
+- Café da manhã, almoço, jantar e lanches por dia
+- Informações de calorias, proteínas, carboidratos e gorduras
+- Salvamento, exclusão, favoritos e compartilhamento de planos
+- Lista de compras agrupada por categoria e gerada a partir do plano
+- Registro de peso com histórico e gráficos de evolução
+- Assinaturas semanal, mensal e anual com Stripe Checkout
+- Webhooks para ativação, falha de pagamento e cancelamento
+- Proteção das áreas de plano e perfil conforme autenticação e assinatura
+
+## Tecnologias
+
+| Camada | Tecnologias |
+| --- | --- |
+| Aplicação | Next.js 15, React 19 e TypeScript |
+| Interface | Tailwind CSS, Framer Motion, Lucide, Recharts e Chart.js |
+| Estado assíncrono | TanStack React Query |
+| Autenticação | Clerk |
+| Inteligência artificial | OpenRouter por meio do SDK compatível da OpenAI |
+| Dados | PostgreSQL e Prisma ORM |
+| Pagamentos | Stripe Checkout e Stripe Webhooks |
+
+## Fluxo principal
+
+```mermaid
+flowchart LR
+    A[Perfil e preferências] --> B[API do SmartPlate]
+    B --> C[Modelo via OpenRouter]
+    C --> D[Plano de 7 dias]
+    D --> E[Salvar e favoritar]
+    D --> F[Lista de compras]
+    D --> G[Acompanhamento]
+```
+
+## Estrutura
+
+```text
+app/
+├── api/                     # IA, planos, perfil, peso e Stripe
+├── mealplan/                # Painel de planejamento alimentar
+├── profile/                 # Perfil e evolução do usuário
+├── sign-up/                 # Cadastro com Clerk
+└── subscribe/               # Escolha de assinatura
+components/                  # Dashboard, lista de compras e gráficos
+hooks/                       # Consultas e mutações com React Query
+lib/                         # Prisma, Stripe, planos e helpers
+prisma/                      # Schema e migrations PostgreSQL
+types/                       # Tipos compartilhados
+```
+
+## Como executar
+
+### Requisitos
+
+- Node.js 20 ou superior
+- npm
+- Banco PostgreSQL
+- Conta no Clerk
+- Chave da OpenRouter
+- Conta e produtos configurados no Stripe
+
+### Instalação
+
+```bash
+git clone https://github.com/einelucas/meal-plan-generator-ai.git
+cd meal-plan-generator-ai
+npm install
+```
+
+Crie `.env.local` na raiz:
+
+```env
+DATABASE_URL="postgresql://usuario:senha@host:5432/smartplate"
+
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_test_..."
+CLERK_SECRET_KEY="sk_test_..."
+
+OPENROUTER_API_KEY="sk-or-..."
+
+STRIPE_SECRET_KEY="sk_test_..."
+STRIPE_WEBHOOK_SECRET="whsec_..."
+STRIPE_PRICE_WEEKLY="price_..."
+STRIPE_PRICE_MONTHLY="price_..."
+STRIPE_PRICE_YEARLY="price_..."
+
+NEXT_PUBLIC_BASE_URL="http://localhost:3000"
+```
+
+Prepare o banco e inicie a aplicação:
+
+```bash
+npx prisma generate
+npx prisma migrate dev
+npm run dev
+```
+
+Acesse [http://localhost:3000](http://localhost:3000).
+
+## Webhook do Stripe em desenvolvimento
+
+Com o Stripe CLI autenticado:
+
+```bash
+stripe listen --forward-to localhost:3000/api/stripe-webhook
+```
+
+Copie o segredo retornado para `STRIPE_WEBHOOK_SECRET`. Os preços configurados no Stripe devem corresponder às variáveis semanal, mensal e anual.
+
+## Principais modelos de dados
+
+- `Profile`: conta, assinatura e dados físicos
+- `UserPreferences`: preferências e objetivo alimentar
+- `MealPlan` e `DayPlan`: plano e dias da semana
+- `Meal`, `Ingredient` e `NutritionalInfo`: refeições e dados nutricionais
+- `ShoppingList`: listas geradas por plano
+- `WeightLog`: histórico de peso
+- `SharedPlan`: compartilhamento por token
+
+## Status
+
+Projeto em evolução. Entre as melhorias previstas estão validação mais rígida das respostas da IA, testes automatizados, revisão dos cálculos nutricionais e aprimoramento das rotas de compartilhamento.
