@@ -87,8 +87,8 @@ types/                       # Tipos compartilhados
 ### Instalação
 
 ```bash
-git clone https://github.com/einelucas/meal-plan-generator-ai.git
-cd meal-plan-generator-ai
+git clone https://github.com/einelucas/smartplate-ai.git
+cd smartplate-ai
 npm install
 ```
 
