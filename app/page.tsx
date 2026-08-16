@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { SignIn, SignUp } from "@clerk/nextjs";
+import { SignedIn, SignedOut } from "@clerk/nextjs";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -12,8 +11,22 @@ import {
   Calendar,
   CheckCircle,
 } from "lucide-react";
+import HomeDashboard from "@/components/HomeDashboard";
 
 export default function HomePage() {
+  return (
+    <>
+      <SignedIn>
+        <HomeDashboard />
+      </SignedIn>
+      <SignedOut>
+        <LandingPage />
+      </SignedOut>
+    </>
+  );
+}
+
+function LandingPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Hero Section com gradiente azul/verde */}

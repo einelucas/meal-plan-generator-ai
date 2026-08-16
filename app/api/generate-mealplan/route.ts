@@ -9,11 +9,35 @@ const openai = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
 });
 
+interface GenerateOverrides {
+  dietType?: string;
+  dietGoal?: string;
+  calories?: number;
+  cookingLevel?: string;
+  allergies?: string[];
+  dislikedFoods?: string[];
+  preferredFoods?: string[];
+  maxPrepTime?: number;
+  budgetLevel?: string;
+  includeSnacks?: boolean;
+  additionalNotes?: string;
+}
+
 export async function POST(request: Request) {
   try {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    }
+
+    // Corpo opcional: quando vem do modal "Gerar Novo Plano", contém as
+    // preferências que o usuário ajustou para esta geração específica.
+    let overrides: GenerateOverrides = {};
+    try {
+      const body = await request.json();
+      if (body && typeof body === "object") overrides = body;
+    } catch {
+      // sem body (ex: botão rápido "Gerar Novo Plano" da Início) — segue só com os dados salvos
     }
 
     const [profile, preferences] = await Promise.all([
@@ -30,9 +54,11 @@ export async function POST(request: Request) {
       prisma.userPreferences.findUnique({
         where: { userId },
         select: {
+          allergies: true,
           dislikedFoods: true,
           preferredFoods: true,
           maxPrepTime: true,
+          budgetLevel: true,
           dietGoal: true,
         },
       }),
@@ -45,13 +71,66 @@ export async function POST(request: Request) {
       );
     }
 
-    const dailyCalories = calculateDailyCalories(
-      profile.height || 170,
-      profile.currentWeight,
-      profile.targetWeight
-    );
+    // Se vieram ajustes do modal, persiste no perfil/preferências para as próximas gerações lembrarem.
+    const hasOverrides = Object.keys(overrides).length > 0;
+    if (hasOverrides) {
+      await Promise.all([
+        prisma.profile.update({
+          where: { userId },
+          data: {
+            ...(overrides.dietType !== undefined && { dietType: overrides.dietType }),
+            ...(overrides.cookingLevel !== undefined && { cookingLevel: overrides.cookingLevel }),
+          },
+        }),
+        prisma.userPreferences.upsert({
+          where: { userId },
+          update: {
+            ...(overrides.allergies !== undefined && { allergies: overrides.allergies }),
+            ...(overrides.dislikedFoods !== undefined && { dislikedFoods: overrides.dislikedFoods }),
+            ...(overrides.preferredFoods !== undefined && { preferredFoods: overrides.preferredFoods }),
+            ...(overrides.maxPrepTime !== undefined && { maxPrepTime: overrides.maxPrepTime }),
+            ...(overrides.budgetLevel !== undefined && { budgetLevel: overrides.budgetLevel }),
+            ...(overrides.dietGoal !== undefined && { dietGoal: overrides.dietGoal }),
+            ...(overrides.additionalNotes !== undefined && { additionalNotes: overrides.additionalNotes }),
+          },
+          create: {
+            userId,
+            allergies: overrides.allergies || [],
+            dislikedFoods: overrides.dislikedFoods || [],
+            preferredFoods: overrides.preferredFoods || [],
+            maxPrepTime: overrides.maxPrepTime,
+            budgetLevel: overrides.budgetLevel,
+            dietGoal: overrides.dietGoal,
+            additionalNotes: overrides.additionalNotes,
+          },
+        }),
+      ]);
+    }
 
-    const prompt = buildPrompt({ profile, preferences, dailyCalories });
+    const dietType = overrides.dietType || profile.dietType || "balanceada";
+    const cookingLevel = overrides.cookingLevel || profile.cookingLevel || "intermediário";
+    const dailyCalories =
+      overrides.calories ||
+      calculateDailyCalories(profile.height || 170, profile.currentWeight, profile.targetWeight);
+
+    const userContext = {
+      peso_atual_kg: profile.currentWeight,
+      peso_meta_kg: profile.targetWeight,
+      altura_cm: profile.height || 170,
+      tipo_de_dieta: dietType,
+      objetivo: overrides.dietGoal || preferences?.dietGoal || "perder peso",
+      nivel_na_cozinha: cookingLevel,
+      calorias_diarias_alvo: dailyCalories,
+      alergias_e_restricoes: overrides.allergies ?? preferences?.allergies ?? [],
+      nao_gosta: overrides.dislikedFoods ?? preferences?.dislikedFoods ?? [],
+      prefere: overrides.preferredFoods ?? preferences?.preferredFoods ?? [],
+      tempo_maximo_preparo_min: overrides.maxPrepTime ?? preferences?.maxPrepTime ?? 30,
+      orcamento: overrides.budgetLevel ?? preferences?.budgetLevel ?? "medium",
+      incluir_lanches: overrides.includeSnacks ?? true,
+      observacoes_adicionais: overrides.additionalNotes || "",
+    };
+
+    const prompt = buildPrompt(userContext);
 
     const response = await openai.chat.completions.create({
       model: "openai/gpt-3.5-turbo",
@@ -81,8 +160,8 @@ export async function POST(request: Request) {
       mealPlan,
       userData: {
         calories: dailyCalories,
-        dietType: profile.dietType,
-        cookingLevel: profile.cookingLevel,
+        dietType,
+        cookingLevel,
       },
     });
   } catch (error) {
@@ -109,20 +188,20 @@ function calculateDailyCalories(
   return maintenance;
 }
 
-function buildPrompt({ profile, preferences, dailyCalories }: any): string {
+function buildPrompt(userContext: Record<string, unknown>): string {
   return `
-Você é um nutricionista profissional. Crie um plano alimentar de 7 dias.
+Você é um nutricionista profissional. Crie um plano alimentar de 7 dias em português brasileiro, personalizado com base nestes dados do usuário (formato JSON):
 
-DADOS DO USUÁRIO:
-- Peso atual: ${profile.currentWeight}kg | Meta: ${profile.targetWeight}kg
-- Altura: ${profile.height || 170}cm
-- Tipo de dieta: ${profile.dietType || "balanceada"}
-- Nível na cozinha: ${profile.cookingLevel || "intermediário"}
-- Não gosta: ${preferences?.dislikedFoods?.join(", ") || "nenhum"}
-- Prefere: ${preferences?.preferredFoods?.join(", ") || "nenhum"}
-- Tempo máx preparo: ${preferences?.maxPrepTime || 30} min
-- Objetivo: ${preferences?.dietGoal || "perder peso"}
-- Calorias diárias: ${dailyCalories} kcal
+${JSON.stringify(userContext, null, 2)}
+
+Regras importantes:
+- Respeite rigorosamente "alergias_e_restricoes" — nunca inclua esses ingredientes.
+- Evite os itens de "nao_gosta" sempre que possível.
+- Priorize ingredientes/estilos de "prefere" quando fizer sentido.
+- Receitas não devem passar de "tempo_maximo_preparo_min" minutos de preparo.
+- Se "incluir_lanches" for false, retorne "lanches" como um array vazio em todos os dias.
+- Leve "observacoes_adicionais" em conta se houver algo relevante ali.
+- Ajuste as calorias totais do dia para ficar próximo de "calorias_diarias_alvo".
 
 Retorne APENAS JSON com esta estrutura exata (sem markdown, sem texto):
 {

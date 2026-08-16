@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import NavBar from "../components/navbar";
-import { ClerkProvider } from "@clerk/nextjs";
+import PublicNavBar from "../components/PublicNavBar";
+import AppSidebar from "../components/AppSidebar";
+import { ClerkProvider, SignedIn, SignedOut } from "@clerk/nextjs";
 import { ReactQueryClientProvider } from "../components/react-query-client-provider";
 import CreateProfileOnSignIn from "@/components/create-profile";
 import { Toaster } from "react-hot-toast"; // 🔥 1. IMPORTE AQUI
@@ -23,7 +24,6 @@ export default function RootLayout({
         <ReactQueryClientProvider>
           <ClerkProvider>
             <CreateProfileOnSignIn />
-            <NavBar />
 
             {/* 🔥 2. COLOQUE O TOASTER AQUI - ANTES DO MAIN */}
             <Toaster
@@ -37,10 +37,15 @@ export default function RootLayout({
               }}
             />
 
-            {/* Main container for page content */}
-            <main className="max-w-7xl mx-auto pt-16 p-4 min-h-screen">
-              {children}
-            </main>
+            <SignedOut>
+              <PublicNavBar />
+              <main className="max-w-7xl mx-auto pt-16 p-4 min-h-screen">
+                {children}
+              </main>
+            </SignedOut>
+            <SignedIn>
+              <AppSidebar>{children}</AppSidebar>
+            </SignedIn>
           </ClerkProvider>
         </ReactQueryClientProvider>
       </body>

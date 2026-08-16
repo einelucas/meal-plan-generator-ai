@@ -30,11 +30,13 @@ export async function PUT(request: Request) {
     const data = await request.json();
 
     const updateData: Record<string, any> = {};
+    if (data.allergies !== undefined) updateData.allergies = data.allergies;
     if (data.dislikedFoods !== undefined) updateData.dislikedFoods = data.dislikedFoods;
     if (data.preferredFoods !== undefined) updateData.preferredFoods = data.preferredFoods;
     if (data.maxPrepTime !== undefined) updateData.maxPrepTime = parseInt(data.maxPrepTime);
     if (data.budgetLevel !== undefined) updateData.budgetLevel = data.budgetLevel;
     if (data.dietGoal !== undefined) updateData.dietGoal = data.dietGoal;
+    if (data.additionalNotes !== undefined) updateData.additionalNotes = data.additionalNotes;
 
     const updated = await prisma.userPreferences.upsert({
       where: { userId },

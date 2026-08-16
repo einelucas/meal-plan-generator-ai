@@ -25,7 +25,11 @@ model Profile {
   currentWeight        Float?   // peso atual
   dietType             String?  // tipo de dieta atual
   cookingLevel         String?  // nível na cozinha
-  
+
+  // Dica diária da IA (cacheada para não chamar o modelo a cada carregamento)
+  dailyTip             String?
+  dailyTipDate         DateTime?
+
   // Relações
   mealPlans     MealPlan[]
   shoppingLists ShoppingList[]
@@ -171,11 +175,13 @@ model UserPreferences {
   id            String    @id @default(uuid())
   userId        String    @unique
   user          Profile   @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  allergies     String[]  // Restrições/alergias alimentares (array)
   dislikedFoods String[]  // Alimentos que não gosta (array)
-  preferredFoods String[] // Alimentos que prefere (array)
+  preferredFoods String[] // Alimentos/culinárias que prefere (array)
   maxPrepTime   Int?      // Minutos máximos de preparo
   budgetLevel   String?   // "low", "medium", "high"
   dietGoal      String?   // "perder peso", "ganhar massa", "manter"
+  additionalNotes String? // Observações livres do usuário para a geração do plano
   updatedAt     DateTime  @updatedAt
 }
 

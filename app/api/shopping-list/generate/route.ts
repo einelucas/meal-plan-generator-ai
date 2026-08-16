@@ -22,15 +22,16 @@ export async function POST(request: Request) {
     if (!planToProcess)
       return NextResponse.json({ error: "Plano não encontrado" }, { status: 404 });
 
-    const shoppingList = await generateShoppingList(planToProcess);
+    const items = await generateShoppingList(planToProcess);
 
+    let saved = null;
     if (mealPlanId) {
-      await prisma.shoppingList.create({
-        data: { userId, mealPlanId, items: shoppingList },
+      saved = await prisma.shoppingList.create({
+        data: { userId, mealPlanId, items },
       });
     }
 
-    return NextResponse.json(shoppingList);
+    return NextResponse.json({ id: saved?.id ?? null, mealPlanId: mealPlanId ?? null, items });
   } catch (error) {
     console.error("Erro ao gerar lista de compras:", error);
     return NextResponse.json({ error: "Erro ao gerar lista" }, { status: 500 });
@@ -63,31 +64,37 @@ async function resolvePlan(mealPlanId?: string, mealPlan?: any) {
 async function generateShoppingList(planToProcess: any) {
   const prompt = `
 Extraia TODOS os ingredientes deste plano alimentar de 7 dias.
-Agrupe por categoria (Hortifruti, Carnes, Laticínios, Grãos, Temperos, Outros).
+Agrupe por categoria (Hortifruti, Proteínas, Laticínios, Grãos e Cereais, Mercearia).
 Calcule quantidades aproximadas para a semana toda.
-Retorne APENAS JSON com esta estrutura exata:
+Pesquise na web preços médios ATUAIS de supermercado no Brasil (ex: sites de supermercados, comparadores de preço) para estimar o valor de cada item o mais realista possível. Se não encontrar um preço confiável para algum item, estime com base em preços de mercado conhecidos, mas nunca invente um valor absurdo.
+Retorne APENAS JSON com esta estrutura exata (sem markdown, sem texto):
 
 {
-  "categories": {
-    "Hortifruti": ["2 kg de tomate", "1 maço de alface"],
-    "Carnes": ["1 kg de peito de frango"],
-    "Laticínios": ["1 litro de leite"],
-    "Grãos": ["500g de arroz"],
-    "Temperos": ["alho", "cebola", "azeite"],
-    "Outros": []
-  }
+  "items": [
+    { "name": "Tomate", "quantity": "2 kg", "category": "Hortifruti", "estimated_price": 12.5, "checked": false },
+    { "name": "Peito de frango", "quantity": "1 kg", "category": "Proteínas", "estimated_price": 22.9, "checked": false }
+  ]
 }
 
 Plano alimentar: ${JSON.stringify(planToProcess)}
   `.trim();
 
   const response = await openai.chat.completions.create({
-    model: "openai/gpt-3.5-turbo",
+    // ":online" ativa a busca na web da OpenRouter, aterrando os preços em resultados reais em vez de "chutar" com o conhecimento de treino do modelo.
+    model: "openai/gpt-3.5-turbo:online",
     messages: [{ role: "user", content: prompt }],
     temperature: 0.3,
     max_tokens: 1500,
   });
 
   const content = response.choices[0]?.message?.content ?? "";
-  return parseAIJson(content);
+  const parsed = parseAIJson(content);
+  const items = Array.isArray(parsed.items) ? parsed.items : [];
+  return items.map((item: any) => ({
+    name: item.name ?? "Item",
+    quantity: item.quantity ?? "",
+    category: item.category || "Mercearia",
+    estimated_price: typeof item.estimated_price === "number" ? item.estimated_price : 0,
+    checked: false,
+  }));
 }

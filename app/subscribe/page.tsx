@@ -1,24 +1,24 @@
 // app/subscribe/page.tsx
 "use client";
 
+import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { availablePlans, Plan } from "@/lib/plans"; // Adjust the path based on your project structure
-import { useState } from "react";
-import toast, { Toaster } from "react-hot-toast"; // Optional: For better user feedback
+import { useMutation } from "@tanstack/react-query";
+import { availablePlans } from "@/lib/plans";
+import toast, { Toaster } from "react-hot-toast";
+import { motion } from "framer-motion";
+import { Check, Sparkles, Zap, Star, Crown } from "lucide-react";
 
-// Define the shape of the successful response
-type SubscribeResponse = {
-  url: string;
+const planStyle: Record<string, { icon: typeof Zap; color: string; badge?: string; highlight?: boolean }> = {
+  semana: { icon: Zap, color: "from-blue-400 to-blue-600" },
+  mes: { icon: Star, color: "from-[#007BFF] to-[#28A745]", badge: "Mais Popular", highlight: true },
+  ano: { icon: Crown, color: "from-amber-400 to-orange-500", badge: "Melhor Valor" },
 };
 
-// Define the shape of the error response
-type SubscribeError = {
-  error: string;
-};
+type SubscribeResponse = { url: string };
+type SubscribeError = { error: string };
 
-// API call function to subscribe to a plan
 const subscribeToPlan = async ({
   planType,
   userId,
@@ -31,11 +31,7 @@ const subscribeToPlan = async ({
   const res = await fetch("/api/checkout", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      planType,
-      userId,
-      email,
-    }),
+    body: JSON.stringify({ planType, userId, email }),
   });
 
   if (!res.ok) {
@@ -43,141 +39,141 @@ const subscribeToPlan = async ({
     throw new Error(errorData.error || "Algo deu errado.");
   }
 
-  const data: SubscribeResponse = await res.json();
-  return data;
+  return res.json();
 };
 
 export default function SubscribePage() {
-  const { user } = useUser(); // Access the current user
-  const router = useRouter(); // Next.js router for navigation
-  const queryClient = useQueryClient();
+  const { user } = useUser();
+  const router = useRouter();
+  const [selected, setSelected] = useState("mes");
 
   const userId = user?.id;
   const email = user?.emailAddresses?.[0]?.emailAddress || "";
 
-  // React Query's useMutation hook for handling the subscription process
   const mutation = useMutation<SubscribeResponse, Error, { planType: string }>({
     mutationFn: async ({ planType }) => {
-      if (!userId) {
-        throw new Error("Usuário não autenticado.");
-      }
-
+      if (!userId) throw new Error("Usuário não autenticado.");
       return subscribeToPlan({ planType, userId, email });
     },
     onMutate: () => {
-      // Optional: Show a loading toast or similar feedback
       toast.success("Redirecionando para o pagamento...", { id: "subscribe" });
     },
     onSuccess: (data) => {
-      // Update the toast to success
-      toast.success("Redirecting to checkout!", { id: "subscribe" });
-      // Redirect to the Stripe Checkout URL
+      toast.success("Redirecionando para o checkout!", { id: "subscribe" });
       window.location.href = data.url;
     },
     onError: (error) => {
-      // Update the toast to show an error
-      toast.error(error.message || "Algo deu errado.", {
-        id: "subscribe",
-      });
+      toast.error(error.message || "Algo deu errado.", { id: "subscribe" });
     },
   });
 
-  // Handler for subscribing to a plan
   const handleSubscribe = (planType: string) => {
     if (!userId) {
-      // Redirect to sign-up if the user is not signed in
       router.push("/sign-up");
       return;
     }
-
-    // Trigger the mutation
     mutation.mutate({ planType });
   };
 
   return (
-    <div className="px-4 py-8 sm:py-12 lg:py-16">
-      <Toaster position="top-right" /> {/* Optional: For toast notifications */}
-      {/* Section Header */}
-      <div>
-        <h2 className="text-3xl font-bold text-center mt-12 sm:text-5xl tracking-tight">
-          Escolha o plano que melhor se encaixa para você
-        </h2>
-        <p className="max-w-3xl mx-auto mt-4 text-xl text-center">
-          Inicie com o plano semanal e evolua para o mensal ou anual quando
-          estiver pronto para ir mais longe.
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6 md:p-10">
+      <Toaster position="top-right" />
+
+      {/* Header */}
+      <div className="text-center mb-10">
+        <div className="inline-flex items-center gap-2 bg-[#007BFF]/10 text-[#007BFF] px-4 py-1.5 rounded-full text-sm font-semibold mb-4">
+          <Sparkles size={14} />
+          Escolha seu plano
+        </div>
+        <h1 className="text-3xl md:text-4xl font-bold text-slate-800 mb-3">
+          Transforme sua alimentação
+          <br />
+          com IA personalizada
+        </h1>
+        <p className="text-slate-500 max-w-xl mx-auto text-base">
+          Planos flexíveis para você atingir seus objetivos com saúde e praticidade.
         </p>
       </div>
-      {/* Cards Container */}
-      <div className="mt-12 container mx-auto space-y-12 lg:space-y-0 lg:grid lg:grid-cols-3 lg:gap-x-8">
-        {/* Map over availablePlans to render plan cards */}
-        {availablePlans.map((plan, key) => (
-          <div
-            key={key}
-            className="
-              relative p-8 
-              border border-gray-200 rounded-2xl shadow-sm 
-              flex flex-col
-              hover:shadow-md hover:scale-[1.02] 
-              transition-transform duration-200 ease-out
-            "
-          >
-            <div className="flex-1">
-              {/* Conditionally render "Most popular" label */}
-              {plan.isPopular && (
-                <p className="absolute top-0 py-1.5 px-4 bg-emerald-500 text-white rounded-full text-xs font-semibold uppercase tracking-wide transform -translate-y-1/2">
-                  Mais popular
-                </p>
-              )}
-              <h3 className="text-xl font-semibold">{plan.name}</h3>
-              <p className="mt-4 flex items-baseline">
-                <span className="text-5xl font-extrabold tracking-tight">
-                  {plan.amount.toLocaleString("pt-BR", {
-                    style: "currency",
-                    currency: "BRL",
-                  })}
-                </span>
-                <span className="ml-1 text-xl font-semibold">
-                  /{plan.interval}
-                </span>
-              </p>
-              <p className="mt-6">{plan.description}</p>
-              <ul role="list" className="mt-6 space-y-4">
-                {plan.features.map((feature, index) => (
-                  <li key={index} className="flex">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="flex-shrink-0 w-6 h-6 text-emerald-500"
-                    >
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                    <span className="ml-3">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
 
-            <button
-              className={`${
-                plan.interval === "month"
-                  ? "bg-emerald-500 text-white  hover:bg-emerald-600 "
-                  : "bg-emerald-100 text-emerald-700  hover:bg-emerald-200 "
-              }  mt-8 block w-full py-3 px-6 border border-transparent rounded-md text-center font-medium disabled:bg-gray-400 disabled:cursor-not-allowed`}
-              onClick={() => handleSubscribe(plan.interval)}
-              disabled={mutation.isPending}
+      {/* Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+        {availablePlans.map((plan, idx) => {
+          const style = planStyle[plan.interval] ?? planStyle.semana;
+          const Icon = style.icon;
+          const isSelected = selected === plan.interval;
+
+          return (
+            <motion.div
+              key={idx}
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.1 }}
+              onClick={() => setSelected(plan.interval)}
+              className={`relative cursor-pointer rounded-2xl border-2 bg-white transition-all duration-300 overflow-hidden ${
+                style.highlight
+                  ? "border-[#007BFF] shadow-xl shadow-[#007BFF]/20 md:scale-105"
+                  : isSelected
+                  ? "border-slate-400 shadow-lg"
+                  : "border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300"
+              }`}
             >
-              {mutation.isPending ? "Aguarde..." : `Assinar ${plan.name}`}
-            </button>
-          </div>
-        ))}
+              {style.badge && (
+                <div className={`absolute top-4 right-4 text-xs font-bold px-3 py-1 rounded-full text-white bg-gradient-to-r ${style.color}`}>
+                  {style.badge}
+                </div>
+              )}
+
+              <div className={`h-1.5 w-full bg-gradient-to-r ${style.color}`} />
+
+              <div className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${style.color} flex items-center justify-center flex-shrink-0`}>
+                    <Icon size={18} className="text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-800">{plan.name}</h2>
+                    <p className="text-xs text-slate-400">{plan.description}</p>
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <div className="flex items-end gap-1">
+                    <span className="text-sm text-slate-400 mb-1">R$</span>
+                    <span className="text-4xl font-extrabold text-slate-800">{plan.amount.toFixed(2).replace(".", ",")}</span>
+                  </div>
+                  <span className="text-sm text-slate-400">por {plan.interval}</span>
+                </div>
+
+                <ul className="space-y-2.5 mb-6">
+                  {plan.features.map((feature, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-slate-600">
+                      <Check size={15} className="text-[#28A745] mt-0.5 flex-shrink-0" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+
+                <button
+                  className={`w-full py-3 rounded-xl font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                    style.highlight
+                      ? "bg-gradient-to-r from-[#007BFF] to-[#28A745] text-white shadow-md hover:opacity-90"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSubscribe(plan.interval);
+                  }}
+                  disabled={mutation.isPending}
+                >
+                  {mutation.isPending ? "Aguarde..." : `Assinar ${plan.name}`}
+                </button>
+              </div>
+            </motion.div>
+          );
+        })}
       </div>
+
+      <p className="text-center text-xs text-slate-400 mt-8">Cancele a qualquer momento. Sem taxas ocultas. Pagamento seguro.</p>
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 const isPublicRoute = createRouteMatcher([
   "/",
   "/sign-up(.*)",
+  "/sign-in(.*)",
   "/subscribe(.*)",
   "/api/checkout(.*)",
   "/api/stripe-webhook(.*)",
@@ -19,6 +20,7 @@ const isMealPlanRoute = createRouteMatcher(["/mealplan(.*)"]);
 const isProfileRoute = createRouteMatcher(["/profile(.*)"]);
 
 const isSignUpRoute = createRouteMatcher(["/sign-up(.*)"]);
+const isSignInRoute = createRouteMatcher(["/sign-in(.*)"]);
 
 // Clerk's middleware
 export default clerkMiddleware(async (auth, req) => {
@@ -38,8 +40,8 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.redirect(new URL("/sign-up", origin));
   }
 
-  // If user is signed in and visits /sign-up → redirect to mealplan
-  if (isSignUpRoute(req) && userId) {
+  // If user is signed in and visits /sign-up or /sign-in → redirect to mealplan
+  if ((isSignUpRoute(req) || isSignInRoute(req)) && userId) {
     return NextResponse.redirect(new URL("/mealplan", origin));
   }
 
